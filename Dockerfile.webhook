@@ -1,0 +1,17 @@
+# Dockerfile for GLPI Webhook Service
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install dependencies
+RUN pip install --no-cache-dir requests flask python-dotenv
+
+# Copy the webhook script
+COPY webhook/webhook.py /app/
+COPY webhook/requirements.txt /app/
+
+# Expose the webhook port
+EXPOSE 5000
+
+# Run the webhook service
+CMD ["python", "webhook.py"]

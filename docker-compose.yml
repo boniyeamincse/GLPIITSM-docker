@@ -1,0 +1,84 @@
+# GLPI ITSM Docker Compose Setup
+# This setup includes GLPI, MariaDB, Postfix email relay, and a Python webhook for Wazuh integration
+
+version: '3.3'
+
+services:
+  # GLPI Service - IT Service Management System
+  glpi:
+    image: glpi/glpi:latest
+    container_name: glpi
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - glpi_data:/var/www/html/glpi
+      - ./config/php.ini:/usr/local/etc/php/conf.d/glpi-custom.ini
+    environment:
+      - GLPI_DB_HOST=mariadb
+      - GLPI_DB_USER=glpi_user
+      - GLPI_DB_PASSWORD=glpi_password
+      - GLPI_DB_NAME=glpi_db
+    depends_on:
+      - mariadb
+    networks:
+      - glpi_network
+
+  # MariaDB Database Service
+  mariadb:
+    image: mariadb:10.6
+    container_name: mariadb
+    restart: unless-stopped
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=glpi_db
+      - MYSQL_USER=glpi_user
+      - MYSQL_PASSWORD=glpi_password
+    networks:
+      - glpi_network
+
+  # Postfix Email Relay Service
+  postfix:
+    image: catatnight/postfix
+    container_name: postfix
+    restart: unless-stopped
+    environment:
+      - mailname=glpi.example.com
+      - smtp_user=glpi@example.com
+      - smtp_password=email_password
+    ports:
+      - "25:25"
+    networks:
+      - glpi_network
+
+  # Python Webhook Service for Wazuh Integration
+  webhook:
+    build:
+      context: .
+      dockerfile: Dockerfile.webhook
+    container_name: glpi-webhook
+    restart: unless-stopped
+    volumes:
+      - ./webhook:/app
+    environment:
+      - GLPI_URL=http://glpi:80
+      - GLPI_API_TOKEN=your_glpi_api_token
+      - WAZUH_API_URL=http://wazuh-server:55000
+      - WAZUH_API_USER=wazuh_user
+      - WAZUH_API_PASSWORD=wazuh_password
+    depends_on:
+      - glpi
+    networks:
+      - glpi_network
+
+# Docker Volumes for persistent data
+volumes:
+  glpi_data:
+  mariadb_data:
+
+# Custom network for all services
+networks:
+  glpi_network:
+    driver: bridge
